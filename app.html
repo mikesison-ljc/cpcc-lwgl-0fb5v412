@@ -8,7 +8,7 @@ if (!sessionStorage.getItem("cpcc_session")) {
 <!DOCTYPE html>
 <html>
 <head>
-<title>LJC CPCC System v4.1.2</title>
+<title>LJC CPCC System v4.1.5</title>
 
 <!-- Inter Font -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -491,7 +491,7 @@ body.history-open #historyContainer {
   window.OUTLET_NAME    = "LW Global";  // Friendly name for Google Sheet
   window.FIXED_OUTLET   = window.OUTLET_NAME; // legacy reference
   window.HISTORY_OUTLET = window.OUTLET_NAME;
-  window.HISTORY_URL    = "https://script.google.com/macros/s/AKfycbzqT5VRNzKoSH76gbQUOyRuqBPpHBEYLlAtkJPF6lgmLLpAy3ELxADSUT067reuMje66A/exec";
+  window.HISTORY_URL    = "https://script.google.com/macros/s/AKfycbx1ZCL0v6GIVxRYyjuvBtCxCVEe5KX9SBqHbnV3q3Fijx7Er6f-5pgMbEKKqcpLeBwtOg/exec";
 
   const _u =
     "https://script.google.com/macros/s/AKfycbxlZn5aPGcx5lIgg1-jnTCJgHUZrrynIw5fRMgPeRasZRn-rZeq5ZaLz47V54a8H4Fapg/exec";
@@ -675,6 +675,8 @@ function validateTerminal() {
   window._u = null;
   window._f = false;
 
+  let _isSubmitting = false;
+
   /* ===== HELPERS ===== */
   function _mk(d){
     const x = new Date(d);
@@ -835,147 +837,168 @@ function validateTerminal() {
 
 
   /* ===== GOOGLE SHEET PUSH ===== */
-  async function pushToGoogleSheet() {
-    try {
-      const items = _c;
+async function pushToGoogleSheet() {
+  try {
+    const items = _c;
 
-      if (!Object.keys(items).length) {
-        throw new Error("No items to push");
-      }
-
-      const customer = _cn();
-      const limit = _cl[customer] ?? Infinity;
-      let remainingCPCC = Math.max(0, limit - (_u ?? 0));
-
-      let rows = [];
-
-      for (let name in items) {
-        const it = items[name];
-        const lineTotal = it.qty * it.price;
-
-        const netLineTotal = lineTotal / 1.12;       // VAT-excluded
-        const cpccPart = Math.min(netLineTotal, remainingCPCC);
-        const netExcess = Math.max(0, netLineTotal - cpccPart);
-
-        const discount = netExcess * 0.20;
-        const cashPart = netExcess * 0.80;
-
-        remainingCPCC -= cpccPart;
-
-       const vatAmount = lineTotal - netLineTotal;
-
-        rows.push([
-          date.value,                     // A Date
-          OUTLET_NAME,                   // B Outlet
-          cpcc.value,                    // C CPCC Ref
-          customer,                      // D Customer
-          name,                          // E Item
-          it.qty,                        // F Qty
-          it.price,                     // G Unit Price
-          lineTotal,                    // H Gross
-          vatAmount,                    // I VAT
-          netLineTotal,                 // J Net
-          new Date().toLocaleString(),  // K Timestamp
-          "",                            // L
-          cpccPart,                     // M CPCC Part
-          cashPart,                     // N Cash Part
-          discount,                     // O Discount
-          "",                            // P
-          receiptNumber.value || "",    // Q Receipt #
-          remarks.value || ""           // R Remarks
-        ]);
-      }
-
-      const url =
-        "https://script.google.com/macros/s/AKfycbzqT5VRNzKoSH76gbQUOyRuqBPpHBEYLlAtkJPF6lgmLLpAy3ELxADSUT067reuMje66A/exec" +
-        "?apiKey=" + encodeURIComponent(API_KEY) +
-        "&data=" + encodeURIComponent(JSON.stringify(rows));
-  
-      const res = await fetch(url);
-      const text = await res.text();
-      console.log("GOOGLE RESPONSE:", text);
- 
-      if (!res.ok) {
-        throw new Error(text);
-      }
-
-    } catch (e) {
-      console.error("PUSH ERROR:", e);
-      throw e;
+    if (!Object.keys(items).length) {
+      throw new Error("No items to push");
     }
+
+    const customer = _cn();
+    const limit = _cl[customer] ?? Infinity;
+    let remainingCPCC = Math.max(0, limit - (_u ?? 0));
+
+    let rows = [];
+
+    for (let name in items) {
+      const it = items[name];
+      const lineTotal = it.qty * it.price;
+      const netLineTotal = lineTotal / 1.12;       // VAT-excluded
+      const cpccPart = Math.min(netLineTotal, remainingCPCC);
+      const netExcess = Math.max(0, netLineTotal - cpccPart);
+      const discount = netExcess * 0.20;
+      const cashPart = netExcess * 0.80;
+      remainingCPCC -= cpccPart;
+      const vatAmount = lineTotal - netLineTotal;
+
+      rows.push([
+        date.value, 			// A Date
+	OUTLET_NAME, 			// B Outlet
+	cpcc.value, 			// C CPCC Ref
+	customer, 			// D Customer
+	name, 				// E Item
+        it.qty, 			// F Qty
+	it.price, 			// G Unit Price
+	lineTotal, 			// H Gross 
+	vatAmount, 			// I VAT 
+	netLineTotal, 			// J Net
+        new Date().toLocaleString(), 	// K Timestamp 
+	"", 				// L
+	cpccPart, 			// M CPCC Part
+	cashPart,			// N Cash Part
+        discount,			// O Discount
+	"", 				// P
+	receiptNumber.value || "", 	// Q Receipt #
+	remarks.value || ""		// R Remarks
+      ]);
+    }
+
+    const url =
+      "https://script.google.com/macros/s/AKfycbx1ZCL0v6GIVxRYyjuvBtCxCVEe5KX9SBqHbnV3q3Fijx7Er6f-5pgMbEKKqcpLeBwtOg/exec" +
+      "?apiKey=" + encodeURIComponent(API_KEY) +
+      "&data=" + encodeURIComponent(JSON.stringify(rows));
+
+    const res = await fetch(url);
+    const text = await res.text();
+    console.log("GOOGLE RESPONSE:", text);
+
+    if (!res.ok) {
+      throw new Error(text);
+    }
+
+    // ✅ Detect duplicates from backend response
+    if (/duplicate/i.test(text)) {
+      return { status: "DUPLICATE" };
+    }
+
+    return { status: "SUCCESS" };
+
+  } catch (e) {
+    console.error("PUSH ERROR:", e);
+    throw e;
   }
+}
 
 
   /* ===== CONFIRM ===== */
-  window.confirmOrder = async function(){
-    if (!window.API_KEY) {
-      alert("Terminal not validated yet");
+window.confirmOrder = async function(){
+  if (!window.API_KEY) {
+    alert("Terminal not validated yet");
+    return;
+  }
+
+  if (!Object.keys(_c).length) {
+    alert("No items in order.");
+    return;
+  }
+
+  const k = _cn();
+  if (!k || !cpcc.value.trim() || !date.value) {
+    alert("Customer, CPCC Ref #, and Date are required.");
+    return;
+  }
+
+  if (!_f) {
+    alert("CPCC not yet updated.\nSystem will sync now.");
+    await new Promise(resolve => {
+      const old = _f;
+      window._uc();
+      const i = setInterval(() => {
+        if (_f !== old) {
+          clearInterval(i);
+          resolve();
+        }
+      }, 100);
+    });
+    return;
+  }
+
+  // 🔹 If there's excess, require receipt number
+  const totalNet = Object.values(_c).reduce((sum, i) => sum + (i.qty * i.price) / 1.12, 0);
+  const limit = _cl[k] ?? Infinity;
+  const used = _u ?? 0;
+  const remaining = Math.max(0, limit - used);
+  const excess = Math.max(0, totalNet - remaining);
+
+  if (excess > 0) {
+    excessReceipt.style.display = "block";
+    const receipt = receiptNumber.value.trim();
+    if (!receipt) {
+      alert("Please enter the receipt number for the cash payment.");
       return;
     }
+  }
 
+  // 🔹 Confirm popup before pushing
+  if (!confirm("Confirm this transaction?")) return;
 
-    if (!Object.keys(_c).length) {
-      alert("No items in order.");
-      return;
-    }
+  // 🔒 HARD LOCK START
+  if (_isSubmitting) return;
+  _isSubmitting = true;
 
-    const k = _cn();
-    if (!k || !cpcc.value.trim() || !date.value) {
-      alert("Customer, CPCC Ref #, and Date are required.");
-      return;
-    }
+  const confirmBtn = document.querySelector("#actions button:nth-child(1)");
+  const originalText = confirmBtn.innerText;
+  confirmBtn.disabled = true;
+  confirmBtn.innerText = "Processing...";
 
-    if (!_f) {
-      alert("CPCC not yet updated.\nSystem will sync now.");
-      await new Promise(resolve => {
-        const old = _f;
-        window._uc();
-        const i = setInterval(() => {
-          if (_f !== old) {
-            clearInterval(i);
-            resolve();
-          }
-        }, 100);
-      });
-      return;
-    }
+// 🔹 Push to Google Sheet with proper duplicate handling
+try {
+  const result = await pushToGoogleSheet();
 
+  if (result?.status === "DUPLICATE") {
+    alert("Duplicate! This CPCC Ref.# was already posted.");
+  } else {
+    alert("Transaction saved successfully!");
 
-    // 🔹 If there's excess, require receipt number
-    const totalNet = Object.values(_c).reduce((sum, i) => sum + (i.qty * i.price) / 1.12, 0);
-    const limit = _cl[k] ?? Infinity;
-    const used = _u ?? 0;
-    const remaining = Math.max(0, limit - used);
-    const excess = Math.max(0, totalNet - remaining);
-
-    if (excess > 0) {
-      excessReceipt.style.display = "block";
-      const receipt = receiptNumber.value.trim();
-      if (!receipt) {
-        alert("Please enter the receipt number for the cash payment.");
-        return;
-      }
-    }
-
-    // 🔹 Confirm popup before pushing
-    if (!confirm("Confirm this transaction?")) return;
-  
-    // 🔹 Push to Google Sheet
-    try {
-      await pushToGoogleSheet();
-      alert("Transaction saved successfully!");
-    } catch (e) {
-      alert("Transaction failed to upload.\nPlease retry.");
-      return;
-    }
-
-
+    // ✅ RESET AFTER SUCCESS
     _c = {};
     _u = null;
     _f = false;
     _rf();
     _r();
-  };
+  }
+
+} catch (e) {
+  alert("Transaction failed to upload.\nPlease retry.");
+  console.error("Confirm Order Error:", e);
+}
+
+  // 🔓 Unlock UI
+  _isSubmitting = false;
+  confirmBtn.disabled = false;
+  confirmBtn.innerText = originalText;
+};
 
 })();
 </script>
@@ -1080,7 +1103,7 @@ window._uc = async function () {
 
   /* ===== HISTORY ===== */
   const _ho = window.OUTLET_NAME; // friendly outlet name for history
-  const _hu = "https://script.google.com/macros/s/AKfycbzqT5VRNzKoSH76gbQUOyRuqBPpHBEYLlAtkJPF6lgmLLpAy3ELxADSUT067reuMje66A/exec";
+  const _hu = "https://script.google.com/macros/s/AKfycbx1ZCL0v6GIVxRYyjuvBtCxCVEe5KX9SBqHbnV3q3Fijx7Er6f-5pgMbEKKqcpLeBwtOg/exec";
 
   window.openHistory = function(){
     document.body.classList.add("history-open");
