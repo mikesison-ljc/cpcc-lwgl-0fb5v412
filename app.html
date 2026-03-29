@@ -494,7 +494,7 @@ body.history-open #historyContainer {
   window.HISTORY_URL    = "https://script.google.com/macros/s/AKfycbx1ZCL0v6GIVxRYyjuvBtCxCVEe5KX9SBqHbnV3q3Fijx7Er6f-5pgMbEKKqcpLeBwtOg/exec";
 
   const _u =
-    "https://script.google.com/macros/s/AKfycbxlZn5aPGcx5lIgg1-jnTCJgHUZrrynIw5fRMgPeRasZRn-rZeq5ZaLz47V54a8H4Fapg/exec";
+    "https://script.google.com/macros/s/AKfycbxv-fUnGqfHhMcFd_OegAfAUqQ_Gh3cmqp1CmmypBCe2gbv9p8NaI4b7mdExJuRUDNNMA/exec";
 
   const _s = function (m) {
     document.body.innerHTML =
@@ -505,30 +505,38 @@ body.history-open #historyContainer {
       "</div>";
   };
 
-  window._cb = function (p) {
-    try {
-      if (!p.ok) throw 0;
-
-      const d = new Date();
-      const r = p.terminals.find(e =>
-        e.outlet === _o &&
-        e.terminal === _t &&
-        e.active === "Y" &&
-        (!e.expiry || new Date(e.expiry) >= d)
-      );
-
-      if (!r) {
-        _s("TERMINAL DISABLED<br><br>Contact Head Office");
-        return;
-      }
-
-      console.log("✅ Terminal validated");
-      document.getElementById("pinModal").style.display = "flex";
-
-    } catch {
-      _s("LICENSE SERVER UNREACHABLE");
+window._cb = function (p) {
+  try {
+    if (!p.ok) {
+      console.error("Terminal check failed:", p);
+      _s("TERMINAL ERROR: " + p.error);
+      return;
     }
-  };
+
+    const d = new Date();
+    const r = p.terminals.find(e =>
+      e.outlet === _o &&
+      e.terminal === _t &&
+      e.active === "Y" &&
+      (!e.expiry || new Date(e.expiry) >= d)
+    );
+
+    if (!r) {
+      _s("TERMINAL DISABLED<br><br>Contact Head Office");
+      return;
+    }
+
+    console.log("✅ Terminal validated");
+
+    // 🔹 Only show PIN modal if there's NO existing session
+    if (!window.SESSION_TOKEN && !sessionStorage.getItem("cpcc_session")) {
+      document.getElementById("pinModal").style.display = "flex";
+    }
+
+  } catch {
+    _s("LICENSE SERVER UNREACHABLE");
+  }
+};
 
   
   window.TERMINAL_URL = _u;
@@ -564,12 +572,20 @@ body.history-open #historyContainer {
     }
 
     if (r.valid) {
+      // ✅ STORE SESSION TOKEN
+      window.SESSION_TOKEN = r.sessionToken;
+
+      console.log("SESSION TOKEN:", window.SESSION_TOKEN);
+		
       const m = document.getElementById("pinModal");
       if (m) m.style.display = "none";
 
       const l = document.getElementById("lockTimer");
       if (l) l.style.display = "none";
 
+      // ✅ NOW validate terminal AFTER PIN
+      validateTerminal();		
+		
       window._sa();
       return;
     }
@@ -1340,7 +1356,6 @@ window._uc = async function () {
     cpcc.onclick = () => { _ai = cpcc; safeShow(numpad); safeHide(keyboard); };
     remarks.onclick = () => { _ai = remarks; safeShow(keyboard); safeHide(numpad); };
   });
-
 
   /* ===== PAD CONTROLS ===== */
   window.padInput = v => { if (_ai) _ai.value += v; };
